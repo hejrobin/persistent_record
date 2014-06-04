@@ -165,6 +165,10 @@ class ActiveRecord::Base
       self.class.notify_observers(:after_restore, self) if self.class.respond_to?(:notify_observers)
     }
 
+    unless connection.column_exists?(table_name, record_deleted_at_column)
+      raise(ActiveModel::MissingAttributeError)
+    end
+
   end
 
   def self.persistent?

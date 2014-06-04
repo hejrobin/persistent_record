@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["hej@carbin.se"]
   spec.description   = %q{Introduces soft deletions for ActiveRecord.}
   spec.summary       = %q{Introduces soft deletions for ActiveRecord.}
-  spec.homepage      = "http://carbin.se/"
+  spec.homepage      = "http://github.com/lessthanthree/persistent_record"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($/)
