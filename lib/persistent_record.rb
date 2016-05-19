@@ -97,7 +97,7 @@ module PersistentRecord
             associated_records.each(&:force_destroy!)
           end
         end
-        default_destroy!
+        default_destroy
       end
     end
   end
