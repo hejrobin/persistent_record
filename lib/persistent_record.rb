@@ -84,6 +84,24 @@ module PersistentRecord
     !!send(record_deleted_at_column)
   end
 
+  def force_destroy!
+    transaction do
+      run_callbacks(:force_destroy) do
+        dependent_reflections = self.class.reflections.select do |name, reflection|
+          reflection.options[:dependent] == :destroy
+        end
+        if dependent_reflections.any?
+          dependent_reflections.each do |name|
+            associated_records = self.send(name)
+            associated_records = associated_records.with_discarded if associated_records.respond_to?(:with_discarded)
+            associated_records.each(&:force_destroy!)
+          end
+        end
+        default_destroy!
+      end
+    end
+  end
+
   private
 
   def touch_record_deleted_at_column(with_transaction = false)
@@ -120,28 +138,7 @@ class ActiveRecord::Base
 
   def self.acts_as_persistent(options = {})
 
-    alias :destroy! :destroy
-    alias :delete! :delete
-
-    def force_destroy!
-      transaction do
-        run_callbacks(:force_destroy) do
-          dependent_reflections = self.class.reflections.select do |name, reflection|
-            reflection.options[:dependent] == :destroy
-          end
-          if dependent_reflections.any?
-            dependent_reflections.each do |name|
-              associated_records = self.send(name)
-              associated_records = associated_records.with_discarded if associated_records.respond_to?(:with_discarded)
-              associated_records.each(&:force_destroy!)
-            end
-          end
-          destroy!
-        end
-      end
-    end
-
-    alias :zap! :force_destroy!
+    alias_method :default_destroy, :destroy
 
     include PersistentRecord
 
