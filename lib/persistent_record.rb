@@ -1,8 +1,6 @@
 require "persistent_record/version"
 require 'active_record' unless defined? ActiveRecord
 
-
-
 module PersistentRecord
 
   def self.included(source)
@@ -28,9 +26,6 @@ module PersistentRecord
       with_discarded.where.not(record_deleted_at_column => nil)
     end
 
-    alias :discarded :with_discarded
-    alias :discarded! :only_discarded
-
     def restore(id, options = {})
       if id.is_a?(Array)
         id.map { |one_id| restore(one_id, options) }
@@ -42,25 +37,20 @@ module PersistentRecord
   end
 
   module Callbacks
-
     def self.extended(source)
-
-      source.define_callbacks :restore
-
-      source.define_singleton_method("before_restore") do |*args, &block|
-        set_callback(:restore, :before, *args, &block)
+      [:restore, :force_destroy].each do |callback_name|
+        source.define_callbacks callback_name
+        source.define_singleton_method("before_#{callback_name}") do |*args, &block|
+          set_callback(callback_name, :before, *args, &block)
+        end
+        source.define_singleton_method("around_#{callback_name}") do |*args, &block|
+          set_callback(callback_name, :around, *args, &block)
+        end
+        source.define_singleton_method("after_#{callback_name}") do |*args, &block|
+          set_callback(callback_name, :after, *args, &block)
+        end
       end
-
-      source.define_singleton_method("around_restore") do |*args, &block|
-        set_callback(:restore, :around, *args, &block)
-      end
-
-      source.define_singleton_method("after_restore") do |*args, &block|
-        set_callback(:restore, :after, *args, &block)
-      end
-
     end
-
   end
 
   def destroy
@@ -107,11 +97,9 @@ module PersistentRecord
   end
 
   def restore_associated_records
-
     destroyed_associations = self.class.reflect_on_all_associations.select do |association|
       association.options[:dependent] == :destroy
     end
-
     destroyed_associations.each do |association|
       association_data = send(association.name)
       unless association_data.nil?
@@ -124,7 +112,6 @@ module PersistentRecord
         end
       end
     end
-
   end
 
 end
@@ -136,19 +123,25 @@ class ActiveRecord::Base
     alias :destroy! :destroy
     alias :delete! :delete
 
-    def zap!
-      dependent_reflections = self.reflections.select do |name, reflection|
-        reflection.options[:dependent] == :destroy
-      end
-      if dependent_reflections.any?
-        dependent_reflections.each do |name|
-          associated_records = self.send(name)
-          associated_records = associated_records.with_discarded if associated_records.respond_to?(:with_discarded)
-          associated_records.each(&:zap!)
+    def force_destroy!
+      transaction do
+        run_callbacks(:force_destroy) do
+          dependent_reflections = self.class.reflections.select do |name, reflection|
+            reflection.options[:dependent] == :destroy
+          end
+          if dependent_reflections.any?
+            dependent_reflections.each do |name|
+              associated_records = self.send(name)
+              associated_records = associated_records.with_discarded if associated_records.respond_to?(:with_discarded)
+              associated_records.each(&:force_destroy!)
+            end
+          end
+          destroy!
         end
       end
-      destroy!
     end
+
+    alias :zap! :force_destroy!
 
     include PersistentRecord
 

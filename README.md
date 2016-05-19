@@ -13,5 +13,10 @@ Migrate your models by adding a "deleted_at" timestamp, `rails generate migratio
 	class YourModel < ActiveRecord::Base
 
 		acts_as_persistent
-	
+
 	end
+
+
+## Deprecation Warning
+
+* `zap!` is now an alias for `force_destroy!`, will be removed in 1.0.
